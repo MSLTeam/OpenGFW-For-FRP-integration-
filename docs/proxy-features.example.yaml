@@ -1,0 +1,41 @@
+grayPercent: 100
+sourcePenaltyEnabled: true
+sourcePenaltyTTLSeconds: 600
+sourcePenaltyTriggerScore: 85
+sourcePenaltyBlockScore: 100
+sourcePenaltyMaxEntries: 65536
+
+tcpEncryptedMinBytes: 96
+tcpEntropyThreshold: 6.8
+tcpPrintableThreshold: 0.5
+
+udpInvalidCountThreshold: 10
+udpEncryptedMinBytes: 96
+udpEntropyThreshold: 6.8
+udpPrintableThreshold: 0.45
+
+tls:
+  hysteriaKeywords:
+    - hysteria
+    - hy2
+  tuicKeywords:
+    - tuic
+  trojanKeywords:
+    - trojan
+  v2rayKeywords:
+    - vmess
+    - vless
+    - v2ray
+    - xray
+    - sing-box
+    - clash
+    - shadow
+    - shadowsocks
+  commonALPN:
+    - h2
+    - h3
+    - h3-29
+    - h3-32
+    - h3-34
+    - http/1.1
+    - acme-tls/1

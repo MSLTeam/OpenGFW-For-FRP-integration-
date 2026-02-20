@@ -1,0 +1,14 @@
+{"name":"tcp_socks5_block","transport":"tcp","src_ip":"10.1.0.1","segments":["hex:05020002"],"expected":{"is_proxy":true,"protocol":"socks5","min_sensitivity":95,"action":"block"}}
+{"name":"tcp_http_connect_block","transport":"tcp","src_ip":"10.1.0.2","segments":["ascii:CONNECT edge.example.com:443 HTTP/1.1\r\nHost: edge.example.com:443\r\n\r\n"],"expected":{"is_proxy":true,"protocol":"http_connect","min_sensitivity":90,"action":"block"}}
+{"name":"tcp_openvpn_block","transport":"tcp","src_ip":"10.1.0.3","segments":["hex:0006380000000000"],"expected":{"is_proxy":true,"protocol":"openvpn_tcp","min_sensitivity":90,"action":"block"}}
+{"name":"udp_socks5_relay_block","transport":"udp","src_ip":"10.1.0.4","packets":["hex:000000010102030401bb6869"],"expected":{"is_proxy":true,"protocol":"socks5_udp_relay","min_sensitivity":90,"action":"block"}}
+{"name":"udp_wireguard_block","transport":"udp","src_ip":"10.1.0.5","packets":["hex:01+gen:zeros:147"],"expected":{"is_proxy":true,"protocol":"wireguard","min_sensitivity":90,"action":"block"}}
+{"name":"udp_openvpn_block","transport":"udp","src_ip":"10.1.0.6","packets":["hex:38000000"],"expected":{"is_proxy":true,"protocol":"openvpn_udp","min_sensitivity":90,"action":"block"}}
+{"name":"tcp_vmess_like_block","transport":"tcp","src_ip":"10.1.0.7","segments":["gen:range:80-ff:2"],"expected":{"is_proxy":true,"protocol":"shadowsocks_vmess_like","min_sensitivity":85,"action":"block"}}
+{"name":"udp_vmess_like_block","transport":"udp","src_ip":"10.1.0.8","packets":["gen:range:80-ff:2"],"expected":{"is_proxy":true,"protocol":"shadowsocks_vmess_like_udp","min_sensitivity":85,"action":"block"}}
+{"name":"tcp_ssh_warn","transport":"tcp","src_ip":"10.1.0.9","segments":["ascii:SSH-2.0-OpenSSH_9.7\r\n"],"expected":{"is_proxy":true,"protocol":"ssh_tunnel","min_sensitivity":70,"action":"warn"}}
+{"name":"udp_quic_warn","transport":"udp","src_ip":"10.1.0.10","packets":["hex:c00000000108000102030405060708081011121314151617+gen:zeros:1177"],"expected":{"is_proxy":true,"protocol":"quic_tunnel_candidate","min_sensitivity":60,"action":"warn"}}
+{"name":"tcp_plain_http_allow","transport":"tcp","src_ip":"10.1.0.11","segments":["ascii:GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"],"expected":{"is_proxy":false,"action":"allow"}}
+{"name":"udp_dns_allow","transport":"udp","src_ip":"10.1.0.12","packets":["hex:abcd01000001000000000000076578616d706c6503636f6d0000010001"],"expected":{"is_proxy":false,"action":"allow"}}
+{"name":"tcp_penalty_seed_block","transport":"tcp","src_ip":"10.9.9.9","segments":["hex:050100"],"expected":{"is_proxy":true,"protocol":"socks5","min_sensitivity":90,"action":"block"}}
+{"name":"tcp_penalty_followup_block","transport":"tcp","src_ip":"10.9.9.9","segments":["ascii:GET / HTTP/1.1\r\nHost: innocent.example\r\n\r\n"],"expected":{"is_proxy":true,"protocol":"source_ip_penalty","min_sensitivity":100,"action":"block"}}

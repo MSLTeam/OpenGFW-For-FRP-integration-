@@ -1,0 +1,12 @@
+{"name":"tcp_socks5","transport":"tcp","segments":["hex:05020002"],"expected":{"is_proxy":true,"protocol":"socks5","min_sensitivity":90}}
+{"name":"tcp_http_connect","transport":"tcp","segments":["ascii:CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n"],"expected":{"is_proxy":true,"protocol":"http_connect","min_sensitivity":90}}
+{"name":"tcp_openvpn","transport":"tcp","segments":["hex:0006380000000000"],"expected":{"is_proxy":true,"protocol":"openvpn_tcp","min_sensitivity":90}}
+{"name":"tcp_ssh","transport":"tcp","segments":["ascii:SSH-2.0-OpenSSH_9.7\r\n"],"expected":{"is_proxy":true,"protocol":"ssh_tunnel","min_sensitivity":70}}
+{"name":"tcp_ss_vmess_like","transport":"tcp","segments":["gen:range:80-ff:2"],"expected":{"is_proxy":true,"protocol":"shadowsocks_vmess_like","min_sensitivity":70}}
+{"name":"tcp_plain_http","transport":"tcp","segments":["ascii:GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"],"expected":{"is_proxy":false}}
+{"name":"tcp_short_nonproxy","transport":"tcp","segments":["gen:range:00-1f:2"],"expected":{"is_proxy":false}}
+{"name":"udp_socks5_relay","transport":"udp","packets":["hex:000000010102030401bb6869"],"expected":{"is_proxy":true,"protocol":"socks5_udp_relay","min_sensitivity":90}}
+{"name":"udp_wireguard","transport":"udp","packets":["hex:01+gen:zeros:147"],"expected":{"is_proxy":true,"protocol":"wireguard","min_sensitivity":90}}
+{"name":"udp_openvpn","transport":"udp","packets":["hex:38000000"],"expected":{"is_proxy":true,"protocol":"openvpn_udp","min_sensitivity":90}}
+{"name":"udp_quic_tunnel_candidate","transport":"udp","packets":["hex:c00000000108000102030405060708081011121314151617+gen:zeros:1177"],"expected":{"is_proxy":true,"protocol":"quic_tunnel_candidate","min_sensitivity":60}}
+{"name":"udp_dns_plain","transport":"udp","packets":["hex:abcd01000001000000000000076578616d706c6503636f6d0000010001"],"expected":{"is_proxy":false}}

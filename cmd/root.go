@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	"github.com/apernet/OpenGFW/analyzer"
+	"github.com/apernet/OpenGFW/analyzer/proxy"
 	"github.com/apernet/OpenGFW/analyzer/tcp"
+	"github.com/apernet/OpenGFW/analyzer/traffic"
 	"github.com/apernet/OpenGFW/analyzer/udp"
 	"github.com/apernet/OpenGFW/engine"
 	"github.com/apernet/OpenGFW/io"
@@ -84,7 +86,12 @@ var logFormatMap = map[string]zapcore.EncoderConfig{
 
 // Analyzers & modifiers
 
+var proxyAnalyzer = proxy.NewProxyAnalyzer()
+var trafficAnalyzer = traffic.NewTrafficAnalyzer()
+
 var analyzers = []analyzer.Analyzer{
+	proxyAnalyzer,
+	trafficAnalyzer,
 	&tcp.FETAnalyzer{},
 	&tcp.HTTPAnalyzer{},
 	&tcp.SocksAnalyzer{},
@@ -165,6 +172,8 @@ type cliConfig struct {
 	IO      cliConfigIO      `mapstructure:"io"`
 	Workers cliConfigWorkers `mapstructure:"workers"`
 	Ruleset cliConfigRuleset `mapstructure:"ruleset"`
+	Proxy   cliConfigProxy   `mapstructure:"proxy"`
+	Traffic cliConfigTraffic `mapstructure:"traffic"`
 }
 
 type cliConfigIO struct {
@@ -186,6 +195,36 @@ type cliConfigWorkers struct {
 type cliConfigRuleset struct {
 	GeoIp   string `mapstructure:"geoip"`
 	GeoSite string `mapstructure:"geosite"`
+}
+
+type cliConfigProxy struct {
+	Features string               `mapstructure:"features"`
+	Policy   cliConfigProxyPolicy `mapstructure:"policy"`
+}
+
+type cliConfigProxyPolicy struct {
+	Enabled         *bool `mapstructure:"enabled"`
+	HighThreshold   int   `mapstructure:"highThreshold"`
+	MediumThreshold int   `mapstructure:"mediumThreshold"`
+}
+
+type proxyPolicyConfig struct {
+	Enabled         bool
+	HighThreshold   int
+	MediumThreshold int
+}
+
+type cliConfigTraffic struct {
+	Features string                 `mapstructure:"features"`
+	Policy   cliConfigTrafficPolicy `mapstructure:"policy"`
+}
+
+type cliConfigTrafficPolicy struct {
+	Enabled *bool `mapstructure:"enabled"`
+}
+
+type trafficPolicyConfig struct {
+	Enabled bool
 }
 
 func (c *cliConfig) fillLogger(config *engine.Config) error {
@@ -249,10 +288,35 @@ func runMain(cmd *cobra.Command, args []string) {
 	}
 	defer engineConfig.IO.Close() // Make sure to close IO on exit
 
+	if err := proxyAnalyzer.SetFeatureFile(config.Proxy.Features); err != nil {
+		logger.Fatal("failed to load proxy features", zap.Error(err))
+	}
+	if proxyAnalyzer.HasFeatureFile() {
+		logger.Info("proxy features loaded", zap.String("file", config.Proxy.Features))
+	}
+	if err := trafficAnalyzer.SetFeatureFile(config.Traffic.Features); err != nil {
+		logger.Fatal("failed to load traffic features", zap.Error(err))
+	}
+	if trafficAnalyzer.HasFeatureFile() {
+		logger.Info("traffic features loaded", zap.String("file", config.Traffic.Features))
+	}
+
 	// Ruleset
 	rawRs, err := ruleset.ExprRulesFromYAML(args[0])
 	if err != nil {
 		logger.Fatal("failed to load rules", zap.Error(err))
+	}
+	ppCfg := normalizeProxyPolicy(config.Proxy.Policy)
+	if ppCfg.Enabled {
+		rawRs = withProxyPolicyRules(rawRs, ppCfg)
+		logger.Info("proxy policy enabled",
+			zap.Int("highThreshold", ppCfg.HighThreshold),
+			zap.Int("mediumThreshold", ppCfg.MediumThreshold))
+	}
+	tpCfg := normalizeTrafficPolicy(config.Traffic.Policy)
+	if tpCfg.Enabled {
+		rawRs = withTrafficPolicyRules(rawRs, tpCfg)
+		logger.Info("traffic classification policy enabled")
 	}
 	rsConfig := &ruleset.BuiltinConfig{
 		Logger:               &rulesetLogger{},
@@ -283,16 +347,36 @@ func runMain(cmd *cobra.Command, args []string) {
 		cancelFunc()
 	}()
 	go func() {
-		// Rule reload
+		// Rule, proxy feature & traffic feature reload
 		reloadChan := make(chan os.Signal, 1)
 		signal.Notify(reloadChan, syscall.SIGHUP)
 		for {
 			<-reloadChan
-			logger.Info("reloading rules")
+			logger.Info("reloading rules, proxy features and traffic features")
+			if proxyAnalyzer.HasFeatureFile() {
+				if err := proxyAnalyzer.ReloadFeatures(); err != nil {
+					logger.Error("failed to reload proxy features, using old features", zap.Error(err))
+				} else {
+					logger.Info("proxy features reloaded")
+				}
+			}
+			if trafficAnalyzer.HasFeatureFile() {
+				if err := trafficAnalyzer.ReloadFeatures(); err != nil {
+					logger.Error("failed to reload traffic features, using old features", zap.Error(err))
+				} else {
+					logger.Info("traffic features reloaded")
+				}
+			}
 			rawRs, err := ruleset.ExprRulesFromYAML(args[0])
 			if err != nil {
 				logger.Error("failed to load rules, using old rules", zap.Error(err))
 				continue
+			}
+			if ppCfg.Enabled {
+				rawRs = withProxyPolicyRules(rawRs, ppCfg)
+			}
+			if tpCfg.Enabled {
+				rawRs = withTrafficPolicyRules(rawRs, tpCfg)
 			}
 			rs, err := ruleset.CompileExprRules(rawRs, analyzers, modifiers, rsConfig)
 			if err != nil {
@@ -406,12 +490,34 @@ func (l *engineLogger) AnalyzerErrorf(streamID int64, name string, format string
 type rulesetLogger struct{}
 
 func (l *rulesetLogger) Log(info ruleset.StreamInfo, name string) {
-	logger.Info("ruleset log",
-		zap.String("name", name),
-		zap.Int64("id", info.ID),
-		zap.String("src", info.SrcString()),
-		zap.String("dst", info.DstString()),
-		zap.Any("props", info.Props))
+	score, level := proxySensitivity(info)
+	switch {
+	case strings.HasPrefix(name, "proxy_policy_block_"):
+		logger.Warn("proxy high-similarity blocked",
+			zap.String("name", name),
+			zap.Int64("id", info.ID),
+			zap.String("src", info.SrcString()),
+			zap.String("dst", info.DstString()),
+			zap.Any("sensitivity_score", score),
+			zap.Any("sensitivity_level", level),
+			zap.Any("props", info.Props))
+	case strings.HasPrefix(name, "proxy_policy_warn_"):
+		logger.Warn("proxy similarity warning",
+			zap.String("name", name),
+			zap.Int64("id", info.ID),
+			zap.String("src", info.SrcString()),
+			zap.String("dst", info.DstString()),
+			zap.Any("sensitivity_score", score),
+			zap.Any("sensitivity_level", level),
+			zap.Any("props", info.Props))
+	default:
+		logger.Info("ruleset log",
+			zap.String("name", name),
+			zap.Int64("id", info.ID),
+			zap.String("src", info.SrcString()),
+			zap.String("dst", info.DstString()),
+			zap.Any("props", info.Props))
+	}
 }
 
 func (l *rulesetLogger) MatchError(info ruleset.StreamInfo, name string, err error) {
@@ -428,4 +534,95 @@ func envOrDefaultString(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func normalizeProxyPolicy(in cliConfigProxyPolicy) proxyPolicyConfig {
+	enabled := true
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	high := in.HighThreshold
+	if high <= 0 || high > 100 {
+		high = 85
+	}
+	medium := in.MediumThreshold
+	if medium <= 0 || medium >= high {
+		medium = 70
+		if medium >= high {
+			medium = high - 1
+		}
+		if medium <= 0 {
+			medium = 1
+		}
+	}
+	return proxyPolicyConfig{
+		Enabled:         enabled,
+		HighThreshold:   high,
+		MediumThreshold: medium,
+	}
+}
+
+func withProxyPolicyRules(raw []ruleset.ExprRule, cfg proxyPolicyConfig) []ruleset.ExprRule {
+	rules := []ruleset.ExprRule{
+		{
+			Name:   "proxy_policy_block_source_penalty",
+			Action: "block",
+			Log:    true,
+			Expr:   `proxy != nil && proxy.protocol == "source_ip_penalty"`,
+		},
+		{
+			Name:   "proxy_policy_block_high",
+			Action: "block",
+			Log:    true,
+			Expr:   fmt.Sprintf(`proxy != nil && proxy.sensitivity_score >= %d`, cfg.HighThreshold),
+		},
+		{
+			Name: "proxy_policy_warn_medium",
+			Log:  true,
+			Expr: fmt.Sprintf(`proxy != nil && proxy.sensitivity_score >= %d && proxy.sensitivity_score < %d`,
+				cfg.MediumThreshold, cfg.HighThreshold),
+		},
+		{
+			Name: "proxy_policy_warn_low",
+			Log:  true,
+			Expr: fmt.Sprintf(`proxy != nil && proxy.sensitivity_score > 0 && proxy.sensitivity_score < %d`,
+				cfg.MediumThreshold),
+		},
+	}
+	out := make([]ruleset.ExprRule, 0, len(rules)+len(raw))
+	out = append(out, rules...)
+	out = append(out, raw...)
+	return out
+}
+
+func normalizeTrafficPolicy(in cliConfigTrafficPolicy) trafficPolicyConfig {
+	enabled := true
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	return trafficPolicyConfig{Enabled: enabled}
+}
+
+func withTrafficPolicyRules(raw []ruleset.ExprRule, cfg trafficPolicyConfig) []ruleset.ExprRule {
+	if !cfg.Enabled {
+		return raw
+	}
+	rules := []ruleset.ExprRule{
+		{
+			Name: "traffic_classification_log",
+			Log:  true,
+			Expr: `traffic != nil`,
+		},
+	}
+	out := make([]ruleset.ExprRule, 0, len(rules)+len(raw))
+	out = append(out, rules...)
+	out = append(out, raw...)
+	return out
+}
+
+func proxySensitivity(info ruleset.StreamInfo) (score interface{}, level interface{}) {
+	if p, ok := info.Props["proxy"]; ok && p != nil {
+		return p["sensitivity_score"], p["sensitivity_level"]
+	}
+	return nil, nil
 }

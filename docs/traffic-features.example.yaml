@@ -1,0 +1,31 @@
+grayPercent: 100
+tcpScanLimit: 1024
+udpInvalidCountThreshold: 4
+builtinPortTagEnabled: true
+
+minecraft:
+  # 将你的 MSL-FRP 对外端口加入这里，可把经过该端口的 Minecraft 流量标注为服务端流量
+  javaServerPorts:
+    - 25565
+    # - 40000
+  bedrockServerPorts:
+    - 19132
+    - 19133
+
+# 你可以按需扩展任何 MSLFRP 穿透业务标签（不仅 Minecraft）
+serviceTags:
+  - name: MSLFRP Node API
+    family: mslfrp
+    role: service
+    transport: tcp
+    ports:
+      - 25570
+    confidence: 93
+  - name: MSLFRP Game Relay
+    family: mslfrp
+    role: relay
+    transport: udp
+    ports:
+      - 30000
+      - 30001
+    confidence: 88

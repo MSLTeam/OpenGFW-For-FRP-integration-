@@ -1,0 +1,32 @@
+- name: log_traffic_classification
+  log: true
+  expr: traffic != nil
+
+- name: log_mc_server_je
+  log: true
+  expr: traffic != nil && traffic.label == "MC Server (JE)"
+
+- name: log_mc_server_be
+  log: true
+  expr: traffic != nil && traffic.label == "MC Server (BE)"
+
+- name: log_mc_client_client
+  log: true
+  expr: traffic != nil && traffic.label == "MC Client - Client"
+
+- name: log_proxy_types
+  log: true
+  expr: traffic != nil && traffic.family == "proxy"
+
+- name: log_builtin_services
+  log: true
+  expr: traffic != nil && (traffic.family == "web" || traffic.family == "database" || traffic.family == "remote_admin" || traffic.family == "dns")
+
+- name: log_mslfrp_custom_tags
+  log: true
+  expr: traffic != nil && traffic.family == "mslfrp"
+
+- name: block_proxy_penalty
+  action: block
+  log: true
+  expr: traffic != nil && traffic.label == "Proxy Source Penalty"

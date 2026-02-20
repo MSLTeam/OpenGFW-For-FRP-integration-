@@ -1,0 +1,28 @@
+grayPercent: 100
+tcpScanLimit: 1024
+udpInvalidCountThreshold: 4
+builtinPortTagEnabled: true
+
+minecraft:
+  javaServerPorts:
+    - 25565
+  bedrockServerPorts:
+    - 19132
+    - 19133
+
+serviceTags:
+  - name: MSLFRP Node API
+    family: mslfrp
+    role: service
+    transport: tcp
+    ports:
+      - 25570
+    confidence: 93
+  - name: MSLFRP UDP Relay
+    family: mslfrp
+    role: relay
+    transport: udp
+    ports:
+      - 30000
+      - 30001
+    confidence: 88

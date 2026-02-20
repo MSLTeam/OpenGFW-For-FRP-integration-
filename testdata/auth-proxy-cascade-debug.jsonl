@@ -1,0 +1,6 @@
+{"name":"auth_proxy_seed_socks5_userpass","transport":"tcp","src_ip":"172.20.10.9","segments":["hex:05020002"],"expected":{"is_proxy":true,"protocol":"socks5","min_sensitivity":95,"action":"block"}}
+{"name":"auth_proxy_followup_http_same_src","transport":"tcp","src_ip":"172.20.10.9","segments":["ascii:GET /health HTTP/1.1\r\nHost: internal.local\r\n\r\n"],"expected":{"is_proxy":true,"protocol":"source_ip_penalty","min_sensitivity":100,"action":"block"}}
+{"name":"auth_proxy_followup_dns_same_src","transport":"udp","src_ip":"172.20.10.9","packets":["hex:abcd01000001000000000000076578616d706c6503636f6d0000010001"],"expected":{"is_proxy":true,"protocol":"source_ip_penalty","min_sensitivity":100,"action":"block"}}
+{"name":"medium_seed_ssh_warn_only","transport":"tcp","src_ip":"172.20.10.10","segments":["ascii:SSH-2.0-OpenSSH_9.7\r\n"],"expected":{"is_proxy":true,"protocol":"ssh_tunnel","min_sensitivity":70,"action":"warn"}}
+{"name":"medium_followup_http_no_penalty","transport":"tcp","src_ip":"172.20.10.10","segments":["ascii:GET /index HTTP/1.1\r\nHost: example.com\r\n\r\n"],"expected":{"is_proxy":false,"action":"allow"}}
+{"name":"clean_control_http_allow","transport":"tcp","src_ip":"172.20.10.11","segments":["ascii:GET / HTTP/1.1\r\nHost: example.org\r\n\r\n"],"expected":{"is_proxy":false,"action":"allow"}}

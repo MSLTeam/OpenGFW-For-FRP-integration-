@@ -1,0 +1,16 @@
+- name: monitor_explicit_proxy
+  log: true
+  expr: proxy != nil && proxy.type == "explicit_proxy"
+
+- name: monitor_vpn_tunnel
+  log: true
+  expr: proxy != nil && proxy.type == "vpn_tunnel"
+
+- name: monitor_high_sensitivity_proxy
+  log: true
+  expr: proxy != nil && proxy.sensitivity_score >= 85
+
+- name: monitor_proxy_candidates
+  log: true
+  expr: proxy != nil && proxy.type == "proxy_candidate"
+
