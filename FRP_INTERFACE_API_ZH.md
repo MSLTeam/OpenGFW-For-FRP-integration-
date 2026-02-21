@@ -13,11 +13,16 @@
 
 ## 1. 包路径与核心对象
 
-Go 包路径：
+Go 包导入路径（代码中的 `import`）：
 
 ```go
 import frpint "github.com/apernet/OpenGFW/integration/frp"
 ```
+
+说明：
+
+- 当前仓库 `go.mod` 的模块名是 `github.com/apernet/OpenGFW`，所以代码导入路径必须使用上面这个值。
+- 如果你在 FRP 项目里要强制使用你自己的仓库与分支（`MSLTeam/OpenGFW-For-FRP-integration-@monitor`），请在 FRP 的 `go.mod` 加 `replace`，见下文。
 
 核心对象：
 
@@ -30,6 +35,22 @@ import frpint "github.com/apernet/OpenGFW/integration/frp"
 ---
 
 ## 2. 初始化接口
+
+### 2.0 在 FRP 项目中引用本仓库分支（推荐）
+
+在 FRP 项目 `go.mod` 增加：
+
+```go
+replace github.com/apernet/OpenGFW => github.com/MSLTeam/OpenGFW-For-FRP-integration- monitor
+```
+
+然后代码里仍然这样导入：
+
+```go
+import frpint "github.com/apernet/OpenGFW/integration/frp"
+```
+
+这样就会从你指定的仓库分支拉取实现。
 
 ### 2.1 `DefaultConfig() Config`
 
@@ -380,4 +401,3 @@ func main() {
 - 对 `ActionBlock` 执行“立即阻断”，并记录 `Reason`、`Proxy.Raw`、`Traffic.Raw` 便于审计。
 - 对 `ActionWarn` 至少落日志并打指标，后续用于阈值调优。
 - 特征文件更新后调用 `ReloadFeatures()`，避免重启进程。
-

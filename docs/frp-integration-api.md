@@ -25,6 +25,14 @@ if err != nil {
 }
 ```
 
+如果 FRP 端要固定使用本仓库分支 `feat/frp-sensitive-monitoring`，请在 FRP 的 `go.mod` 增加：
+
+```go
+replace github.com/apernet/OpenGFW => github.com/MSLTeam/OpenGFW-For-FRP-integration- monitor
+```
+
+说明：当前模块名由本仓库 `go.mod` 决定为 `github.com/apernet/OpenGFW`，所以 `import` 路径仍使用 `github.com/apernet/OpenGFW/integration/frp`。
+
 ## 2. 逐连接流式调用（推荐）
 
 ```go
